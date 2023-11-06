@@ -34,33 +34,39 @@ library(enrichR)
 library(garnett)
 library(rlang)
 
-# Load dataset
-data1 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0001_cellranger_filtered_feature_bc_matrix")
-result1 <- CreateSeuratObject(counts = data1, project = "602791_Pre_BCG_DC")
-data2 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0002_cellranger_filtered_feature_bc_matrix")
-result2 <- CreateSeuratObject(counts = data2, project = "602791_Post_BCG_DC")
-data3 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0003_cellranger_filtered_feature_bc_matrix")
-result3 <- CreateSeuratObject(counts = data3, project = "303215_Pre_BCG_DC")
-data4 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0004_cellranger_filtered_feature_bc_matrix")
-result4 <- CreateSeuratObject(counts = data4, project = "303215_Post_BCG_DC")
-data5 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0005_cellranger_filtered_feature_bc_matrix")
-result5 <- CreateSeuratObject(counts = data5, project = "402740_Pre_BCG_DC")
-data6 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0006_cellranger_filtered_feature_bc_matrix")
-result6 <- CreateSeuratObject(counts = data6, project = "402740_Post_BCG_DC")
-data7 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0007_cellranger_filtered_feature_bc_matrix")
-result7 <- CreateSeuratObject(counts = data7, project = "Pre_BCG_Lymph_node")
-data8 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0008_cellranger_filtered_feature_bc_matrix")
-result8 <- CreateSeuratObject(counts = data8, project = "Post_BCG_Lymph_node")
+# Define the data and project information
+data_paths <- c(
+  "~/Desktop/11858HJPool01-N__11858HJ0001_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool01-N__11858HJ0002_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool01-N__11858HJ0003_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool01-N__11858HJ0004_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool02-N__11858HJ0005_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool02-N__11858HJ0006_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool02-N__11858HJ0007_cellranger_filtered_feature_bc_matrix",
+  "~/Desktop/11858HJPool02-N__11858HJ0008_cellranger_filtered_feature_bc_matrix"
+)
 
-# Set type
-result1$type <- "602791_Pre_BCG_DC"
-result2$type <- "602791_Post_BCG_DC"
-result3$type <- "303215_Pre_BCG_DC"
-result4$type <- "303215_Post_BCG_DC"
-result5$type <- "402740_Pre_BCG_DC"
-result6$type <- "402740_Post_BCG_DC"
-result7$type <- "Pre_BCG_Lymph_node"
-result8$type <- "Post_BCG_Lymph_node"
+project_names <- c(
+  "602791_Pre_BCG_DC",
+  "602791_Post_BCG_DC",
+  "303215_Pre_BCG_DC",
+  "303215_Post_BCG_DC",
+  "402740_Pre_BCG_DC",
+  "402740_Post_BCG_DC",
+  "Pre_BCG_Lymph_node",
+  "Post_BCG_Lymph_node"
+)
+
+# Load data and create Seurat objects using a loop
+seurat_objects <- list()
+
+for (i in 1:length(data_paths)) {
+  data <- Read10X(data.dir = data_paths[i])
+  result <- CreateSeuratObject(counts = data, project = project_names[i])
+  result$type <- project_names[i]  # Set type
+  seurat_objects[[i]] <- result
+}
+
 
 # Merge dataset into one single seurat object
 pre<-merge(result1, c(result3,result5,result7), add.cell.ids = c("602791_Pre_BCG_DC", "303215_Pre_BCG_DC", "402740_Pre_BCG_DC","Pre_BCG_Lymph_node"))
