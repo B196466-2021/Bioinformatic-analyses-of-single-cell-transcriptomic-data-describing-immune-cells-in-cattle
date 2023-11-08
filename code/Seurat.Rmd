@@ -1,0 +1,1122 @@
+---
+title: "new"
+output: html_document
+---
+```{r}
+# Load libraries
+library(Seurat)
+library(SeuratData)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(scater)
+library(SeuratDisk)
+library(SingleCellExperiment)
+library(scDblFinder)
+library(BiocManager)
+library(celldex)
+library(SingleR)
+library(cowplot)
+library(DoubletFinder)
+library(msigdbr)
+library(fgsea)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(GSEABase)
+library(stringr)
+library(enrichplot)
+library(topGO)
+library(GSVA)
+library(pathview)
+library(DOSE)
+library(GSEABase)
+library(EnhancedVolcano)
+library(enrichR)
+```
+
+```{r}
+# Load dataset
+data1 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0001_cellranger_filtered_feature_bc_matrix")
+result1 <- CreateSeuratObject(counts = data1, project = "602791_Pre_BCG_DC")
+data2 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0002_cellranger_filtered_feature_bc_matrix")
+result2 <- CreateSeuratObject(counts = data2, project = "602791_Post_BCG_DC")
+data3 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0003_cellranger_filtered_feature_bc_matrix")
+result3 <- CreateSeuratObject(counts = data3, project = "303215_Pre_BCG_DC")
+data4 <- Read10X(data.dir ="~/Desktop/11858HJPool01-N__11858HJ0004_cellranger_filtered_feature_bc_matrix")
+result4 <- CreateSeuratObject(counts = data4, project = "303215_Post_BCG_DC")
+data5 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0005_cellranger_filtered_feature_bc_matrix")
+result5 <- CreateSeuratObject(counts = data5, project = "402740_Pre_BCG_DC")
+data6 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0006_cellranger_filtered_feature_bc_matrix")
+result6 <- CreateSeuratObject(counts = data6, project = "402740_Post_BCG_DC")
+data7 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0007_cellranger_filtered_feature_bc_matrix")
+result7 <- CreateSeuratObject(counts = data7, project = "Pre_BCG_Lymph_node")
+data8 <- Read10X(data.dir ="~/Desktop/11858HJPool02-N__11858HJ0008_cellranger_filtered_feature_bc_matrix")
+result8 <- CreateSeuratObject(counts = data8, project = "Post_BCG_Lymph_node")
+```
+
+```{r}
+# Set type
+result1$type <- "602791_Pre_BCG_DC"
+result2$type <- "602791_Post_BCG_DC"
+result3$type <- "303215_Pre_BCG_DC"
+result4$type <- "303215_Post_BCG_DC"
+result5$type <- "402740_Pre_BCG_DC"
+result6$type <- "402740_Post_BCG_DC"
+result7$type <- "Pre_BCG_Lymph_node"
+result8$type <- "Post_BCG_Lymph_node"
+```
+
+
+
+
+```{r}
+# Merge dataset into one single seurat object
+pre<-merge(result1, c(result3,result5,result7), add.cell.ids = c("602791_Pre_BCG_DC", "303215_Pre_BCG_DC", "402740_Pre_BCG_DC","Pre_BCG_Lymph_node"))
+post<-merge(result2, c(result4,result6,result8), add.cell.ids = c("602791_Post_BCG_DC","303215_Post_BCG_DC","402740_Post_BCG_DC","Post_BCG_Lymph_node"))
+pre$type <- "Pre_BCG"
+post$type <- "Post_BCG"
+compare<-merge(pre, c(post), add.cell.ids = c("Pre_BCG", "Post_BCG"))
+compare
+```
+
+
+```{r}
+# Clear unused variables
+rm(data1,result1,data2,result2,data3,result3,data4,result4,data5,result5,data6,result6,data7,result7,data8,result8,pre,post)
+gc()
+```
+
+
+
+
+
+
+
+
+
+```{r}
+# Quality control
+compare[["percent.mt"]] <- PercentageFeatureSet(compare, pattern = "^MT")
+compare[["percent.rb"]] <- PercentageFeatureSet(compare, pattern = "^RP[SL]")
+# Visualize QC metrics as a violin plot
+VlnPlot(compare, features = c("nFeature_RNA","nCount_RNA","percent.mt","percent.rb"),group.by = "orig.ident",ncol = 4,pt.size = 0.1) 
+```
+
+```{r}
+# Scatter Plot
+Scatter1<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
+Scatter1
+ggsave("Scatter1.png",Scatter1)
+Scatter2<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident", pt.size = 0.5)
+Scatter2
+ggsave("Scatter2.png",Scatter2)
+Scatter3<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.rb",group.by = "orig.ident", pt.size = 0.5)
+Scatter3
+ggsave("Scatter3.png",Scatter3)
+Scatter4<-FeatureScatter(compare, feature1 = "percent.rb", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
+Scatter4
+ggsave("Scatter4.png",Scatter4)
+```
+
+
+```{r}
+# Detection-based filtering
+# consider cells with at least 200 detected genes and genes need to be expressed in at least 3 cells
+selected_c <- WhichCells(compare, expression =  nFeature_RNA >200 & nFeature_RNA < 4000)
+selected_f <- rownames(compare)[Matrix::rowSums(compare) > 3]
+compare <- subset(compare, features = selected_f, cells = selected_c)
+```
+
+```{r}
+# Mito/Ribo filtering
+selected_mito <- WhichCells(compare, expression = percent.mt < 0.5 & percent.mt >0.05)
+selected_ribo <- WhichCells(compare, expression = percent.rb < 60 & percent.rb > 5)
+selected_RNA <- WhichCells(compare, expression = nCount_RNA < 39000)
+# and subset the object to only keep those cells
+compare <- subset(compare, cells = selected_mito)
+compare <- subset(compare, cells = selected_ribo)
+compare <- subset(compare, cells = selected_RNA)
+dim(compare)
+table(compare$orig.ident)
+```
+
+```{r}
+# Plot filtered QC
+VlnPlot(compare, features = c("nFeature_RNA","nCount_RNA","percent.mt","percent.rb"),group.by = "orig.ident",ncol = 4,pt.size = 0.1) 
+```
+
+
+
+
+
+
+```{r}
+# Calculate cell-cycle scores
+compare <- NormalizeData(compare)
+compare <- CellCycleScoring(object = compare, g2m.features = cc.genes$g2m.genes,s.features = cc.genes$s.genes)
+```
+
+```{r}
+# Cell cycle plot
+cell_cycle<-VlnPlot(compare, features = c("S.Score", "G2M.Score"), group.by = "orig.ident",ncol = 4, pt.size = 0.1)
+cell_cycle
+ggsave("cell_cycle.png",cell_cycle,width=20, height=10)
+```
+
+```{r}
+compare <- FindVariableFeatures(compare, verbose = F,selection.method = "vst", nfeatures = 2000)
+compare <- ScaleData(compare, vars.to.regress = c("nFeature_RNA", "percent.mt"),verbose = F)
+compare <- RunPCA(compare,npcs =30, verbose = FALSE)
+compare <- RunUMAP(compare, reduction = "pca", dims = 1:30)
+```
+
+
+```{r}
+# Predict doublet
+nExp <- round(ncol(compare) * 0.04)  # expect 4% doublets
+compare <- doubletFinder_v3(compare, pN = 0.25, pK = 0.09, nExp = nExp, PCs = 1:30)
+DF.name = colnames(compare@meta.data)[grepl("DF.classification", colnames(compare@meta.data))]
+cowplot::plot_grid(ncol = 2, DimPlot(compare, group.by = "orig.ident") + NoAxes(),DimPlot(compare, group.by = DF.name) + NoAxes())
+```
+
+```{r}
+# Remove doublet
+compare = compare[, compare@meta.data[, DF.name] == "Singlet"]
+dim(compare)
+```
+
+
+```{r}
+# Identification of highly variable features
+compare <- FindVariableFeatures(compare,verbose = F,selection.method = "vst", nfeatures = 2000)
+top10 <- head(VariableFeatures(compare), 10)
+top10
+top<-LabelPoints(plot = VariableFeaturePlot(compare), points = top10, repel = TRUE)
+top
+ggsave("top.png",top)
+```
+
+```{r}
+# PCA
+compare <- ScaleData(compare, vars.to.regress = c("nFeature_RNA", "percent.mt"))
+compare <- RunPCA(compare, features = VariableFeatures(object = compare),npcs = 30, verbose = FALSE)
+```
+
+
+```{r}
+# PCA plot
+dimplot<- DimPlot(compare, reduction = "pca",group.by = "orig.ident",dims = 1:2)
+dimplot
+ggsave("dimplot.png",dimplot)
+```
+
+```{r}
+# Elbow Plot
+elbow<- ElbowPlot(compare, ndims = 30)
+elbow
+ggsave("elbow.png",elbow)
+```
+
+```{r}
+# TSNE 
+compare <- RunTSNE(compare, reduction = "pca", dims = 1:15, perplexity = 30, max_iter = 1000,theta = 0.5, eta = 200, num_threads = 0)
+tsne<-DimPlot(compare, reduction = "tsne", group.by = "orig.ident")
+tsne
+ggsave("tsne.png",tsne)
+```
+
+```{r}
+# UMAP
+compare <- RunUMAP(compare, reduction = "pca", dims = 1:30)
+umap<-DimPlot(compare, reduction = "umap", group.by = "orig.ident")
+umap
+ggsave("umap.png",umap)
+```
+
+```{r}
+# Integrate datasets
+compare <- SplitObject(compare, split.by = "orig.ident")
+compare <- lapply(X = compare, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+features <- SelectIntegrationFeatures(object.list = compare)
+compare.anchors <- FindIntegrationAnchors(object.list = compare, anchor.features = features)
+compare <- IntegrateData(anchorset = compare.anchors)
+DefaultAssay(compare) <- "integrated"
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+compare <- ScaleData(compare, vars.to.regress = c("nFeature_RNA", "percent.mt"))
+compare <- RunPCA(compare, features = VariableFeatures(object = compare),npcs = 30, verbose = FALSE)
+```
+
+```{r}
+# PCA plot after intergrated
+dimplot<- DimPlot(compare, reduction = "pca",group.by = "orig.ident",dims = 1:2)
+dimplot
+ggsave("dimplot.png",dimplot)
+```
+
+```{r}
+# TSNE after intergrated
+compare <- RunTSNE(compare, reduction = "pca", dims = 1:30, perplexity = 30, max_iter = 1000,theta = 0.5, eta = 200, num_threads = 0)
+tsne<-DimPlot(compare, reduction = "tsne", group.by = "orig.ident")
+tsne
+ggsave("tsne.png",tsne)
+```
+
+```{r}
+# UMAP after intergrated
+compare <- RunUMAP(compare, reduction = "pca", dims = 1:30)
+umap<-DimPlot(compare, reduction = "umap", group.by = "orig.ident")
+umap
+ggsave("umap.png",umap)
+```
+
+```{r}
+# Clustering datasets 
+compare <- FindNeighbors(compare, reduction = "pca", dims = 1:30,k.param = 60, prune.SNN = 1/15)
+compare <- FindClusters(compare, resolution = 0.8)
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# UAMP plot to show cluster cells
+compare <- RunUMAP(compare, reduction = "pca", dims = 1:30)
+cluster<- DimPlot(compare, reduction = "umap", label = TRUE, repel = TRUE)
+cluster
+ggsave("cluster.png",cluster)
+```
+
+```{r}
+# Cell type annotation using SingleR
+monaco.ref <- celldex::MonacoImmuneData()
+compare.sce <- as.SingleCellExperiment(compare)
+monaco.main <- SingleR(test = compare.sce,assay.type.test = 1,ref = monaco.ref,labels = monaco.ref$label.main)
+compare@meta.data$monaco.main <- monaco.main$pruned.labels
+compare.annotation <- SetIdent(compare, value = "monaco.main")
+SingleR<-DimPlot(compare.annotation, label = T , repel = T, label.size = 3)
+SingleR
+ggsave("SingleR.png",SingleR)
+```
+
+
+```{r}
+# Show dendritic cells groups location
+FeaturePlot<-FeaturePlot(compare, features = c("nFeature_RNA","nCount_RNA"),ncol = 4,pt.size = 0.1,cols = c("grey", "red")) 
+ggsave("FeaturePlot1.png",FeaturePlot,width=20)
+FeaturePlot<-FeaturePlot(compare, features = c("percent.mt","percent.rb"),ncol = 4,pt.size = 0.1,cols = c("grey", "red")) 
+ggsave("FeaturePlot2.png",FeaturePlot,width=20)
+cell_cycle<-FeaturePlot(compare, features = c("S.Score", "G2M.Score"),ncol = 4, pt.size = 0.1,cols = c("grey", "red"))
+ggsave("cell_cycle.png",cell_cycle,width=20)
+LYZ<-FeaturePlot(compare, features = c("LYZ"),cols = c("grey", "red"))
+ggsave("LYZ.png",LYZ)
+CD1B<-FeaturePlot(compare, features = c("CD1B"),cols = c("grey", "red"))
+ggsave("CD1B.png",CD1B)
+RBP4<-FeaturePlot(compare, features = c("RBP4"),cols = c("grey", "red"))
+ggsave("RBP4.png",RBP4)
+DNASE1L3<-FeaturePlot(compare, features = c("DNASE1L3"),cols = c("grey", "red"))
+ggsave("DNASE1L3.png",DNASE1L3)
+SIRPA<-FeaturePlot(compare, features = c("SIRPA"),cols = c("grey", "red"))
+ggsave("SIRPA.png",SIRPA)
+EPCAM<-FeaturePlot(compare, features = c("EPCAM"),cols = c("grey", "red"))
+ggsave("EPCAM.png",EPCAM)
+RUNX2<-FeaturePlot(compare, features = c("RUNX2"),cols = c("grey", "red"))
+ggsave("RUNX2.png",RUNX2)
+CSF1R<-FeaturePlot(compare, features = c("CSF1R"),cols = c("grey", "red"))
+ggsave("CSF1R.png",CSF1R)
+S100B<-FeaturePlot(compare, features = c("S100B"),cols = c("grey", "red"))
+ggsave("S100B.png",S100B)
+CD14<-FeaturePlot(compare, features = c("CD14"),cols = c("grey", "red"))
+ggsave("CD14.png",CD14)
+```
+
+
+
+```{r}
+DefaultAssay(compare) <- "RNA"
+compare$label<-as.character(compare$integrated_snn_res.0.8)
+```
+
+
+```{r}
+# Define dendritic cells group 1 
+compare$label<-ifelse(compare$label %in% c(1,3,4,6,13),"DC_g1",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+DC_g1.response<- FindMarkers(compare, ident.1 = "DC_g1_Post_BCG", ident.2 = "DC_g1_Pre_BCG", verbose = FALSE)
+head(DC_g1.response, n = 15)
+write.csv(DC_g1.response,file="table1.csv")
+```
+
+```{r}
+# Volcano plot
+png("volcano.png")
+EnhancedVolcano(DC_g1.response,lab = rownames(DC_g1.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+```{r}
+# Define dendritic cells group 1 subset
+Idents(compare)<-compare$label
+DC1<- subset(compare, idents=c("DC_g1"))
+#FeaturePlot
+FeaturePlot<-FeaturePlot(DC1,features = c("RNF19B"), split.by = "type", max.cutoff ="q90", cols = c("grey", "red"))
+FeaturePlot
+ggsave("FeaturePlot.png",FeaturePlot)
+```
+
+```{r}
+plots <- VlnPlot(DC1, features = c("RNF19B"), group.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+```{r}
+plots <- VlnPlot(DC, features = c("RNF19B"), split.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+
+
+
+
+```{r}
+# Define dendritic cells group 2 
+compare$label<-ifelse(compare$label %in% c(8,16),"DC_g2",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+DC_g2.response<- FindMarkers(compare, ident.1 = "DC_g2_Post_BCG", ident.2 = "DC_g2_Pre_BCG", verbose = FALSE)
+head(DC_g2.response, n = 15)
+write.csv(DC_g2.response,file="table2.csv")
+```
+
+```{r}
+# Volcano plot
+png("volcano_g2.png")
+EnhancedVolcano(DC_g2.response,lab = rownames(DC_g2.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Define dendritic cells group 3 
+compare$label<-ifelse(compare$label %in% c(2),"DC_g3",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+DC_g3.response<- FindMarkers(compare, ident.1 = "DC_g3_Post_BCG", ident.2 = "DC_g3_Pre_BCG", verbose = FALSE)
+head(DC_g3.response, n = 15)
+write.csv(DC_g3.response,file="table3.csv")
+```
+
+```{r}
+# Volcano plot
+png("volcano_g3.png")
+EnhancedVolcano(DC_g3.response,lab = rownames(DC_g3.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+```{r}
+# Define dendritic cells group 3 subset
+Idents(compare)<-compare$label
+DC3<- subset(compare, idents=c("DC_g3"))
+# FeaturePlot
+FeaturePlot<-FeaturePlot(DC3,features = c("RBBP6"), split.by = "type", max.cutoff ="q90", cols = c("grey", "red"))
+FeaturePlot
+ggsave("FeaturePlot.png",FeaturePlot)
+```
+
+```{r}
+plots <- VlnPlot(DC3, features = c("RBBP6"), group.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+```{r}
+plots <- VlnPlot(DC, features = c("RBBP6"), split.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+
+
+
+
+
+
+
+```{r}
+# Define dendritic cells group 4 
+compare$label<-ifelse(compare$label %in% c(0,10,11),"DC_g4",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+DC_g4.response<- FindMarkers(compare, ident.1 = "DC_g4_Post_BCG", ident.2 = "DC_g4_Pre_BCG", verbose = FALSE)
+head(DC_g4.response, n = 15)
+write.csv(DC_g4.response,file="table4.csv")
+```
+
+```{r}
+# Volcano Plot
+png("volcano_g4.png")
+EnhancedVolcano(DC_g4.response,lab = rownames(DC_g4.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+```{r}
+# Define dendritic cells group 4 subset
+Idents(compare)<-compare$label
+DC4<- subset(compare, idents=c("DC_g4"))
+#FeaturePlot
+FeaturePlot<-FeaturePlot(DC4,features = c("SRSF5"), split.by = "type", max.cutoff ="q90", cols = c("grey", "red"))
+FeaturePlot
+ggsave("FeaturePlot.png",FeaturePlot)
+```
+
+```{r}
+plots <- VlnPlot(DC4, features = c("SRSF5"), group.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+```{r}
+plots <- VlnPlot(DC, features = c("SRSF5"), split.by = "type",pt.size = 0.01, combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+
+
+
+
+
+
+
+```{r}
+# Define dendritic cells group 5 
+compare$label<-ifelse(compare$label %in% c(18),"DC_g5",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+DC_g5.response<- FindMarkers(compare, ident.1 = "DC_g5_Post_BCG", ident.2 = "DC_g5_Pre_BCG", verbose = FALSE)
+head(DC_g5.response, n = 15)
+write.csv(DC_g5.response,file="table5.csv")
+```
+
+```{r}
+# Volcano Plot
+png("volcano_g5.png")
+EnhancedVolcano(DC_g5.response,lab = rownames(DC_g5.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Define macrophage group
+compare$label<-ifelse(compare$label %in% c(17),"Macrophage",compare$label)
+compare$celltype<-paste(compare$label,compare$type,sep="_")
+Idents(compare)<-"celltype"
+# Find differentially expressed genes
+Macrophage.compare.response<- FindMarkers(compare, ident.1 = "Macrophage_Post_BCG", ident.2 = "Macrophage_Pre_BCG", verbose = FALSE)
+head(Macrophage.compare.response, n = 15)
+write.csv(Macrophage.compare.response,file="Macrophage.csv")
+```
+
+```{r}
+# Volcano Plot
+png("Macrophage.png")
+EnhancedVolcano(Macrophage.compare.response,lab = rownames(Macrophage.compare.response),x = "avg_log2FC",y = "p_val_adj",pCutoff = 0.05,FCcutoff = 0.5)
+dev.off
+```
+
+```{r}
+# Define macrophage group subset
+Idents(compare)<-compare$label
+macrophage<- subset(compare, idents=c("Macrophage"))
+#FeaturePlot
+FeaturePlot<-FeaturePlot(macrophage, features = c("ARHGDIB"), split.by = "type", max.cutoff = "q90",cols = c("grey", "red"))
+FeaturePlot
+ggsave("FeaturePlot.png",FeaturePlot)
+```
+
+```{r}
+plots <- VlnPlot(macrophage, features = c("ARHGDIB"), group.by = "type",pt.size = 0.01,combine = FALSE,assay = "RNA",log=TRUE)
+wrap_plots(plots = plots, ncol = 1)
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Define the whole dendritic cells subset
+Idents(compare)<-compare$label
+DC<- subset(compare, idents=c("DC_g1","DC_g2","DC_g3","DC_g4","DC_g5"))
+# Find all markers 
+all.markers <- FindAllMarkers(object = DC)
+```
+
+```{r}
+# find the top 20 genes
+all.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 20, wt = avg_log2FC) -> top20
+# make heatmap
+DefaultAssay(DC) <- "integrated"
+Heatmap<-DoHeatmap(DC, features = top20$gene) 
+ggsave("Heatmap.png",Heatmap,height=10)
+# create table
+top20
+write.csv(top20,file="top20.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Go enrichment analysis of dendritic cells group 1
+DC_g1.response <- data.frame(gene = rownames(DC_g1.response), DC_g1.response)
+head(DC_g1.response)
+```
+```{r}
+logFC_t=0.5
+P.Value_t = 0.05
+k1 = (DC_g1.response$p_val_adj < P.Value_t)&(DC_g1.response$avg_log2FC < -logFC_t)
+k2 = (DC_g1.response$p_val_adj < P.Value_t)&(DC_g1.response$avg_log2FC > logFC_t)
+table(k1)
+```
+
+```{r}
+table(k2)
+```
+
+```{r}
+change = ifelse(k1,"down",ifelse(k2,"up","stable"))
+DC_g1.response$change <- change
+head(DC_g1.response)
+```
+
+```{r}
+s2e <- bitr(DC_g1.response$gene, fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+DC_g1.response <- inner_join(DC_g1.response,s2e,by=c("gene"="SYMBOL"))
+head(DC_g1.response)
+```
+
+```{r}
+#GO[Symbol]
+gene_up = DC_g1.response[DC_g1.response$change == 'up','gene'] 
+gene_down = DC_g1.response[DC_g1.response$change == 'down','gene'] 
+gene_diff = c(gene_up,gene_down)
+```
+
+
+```{r}
+# up regulated genes
+ego_CC <- enrichGO(gene = gene_up,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_up, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+```{r}
+# down regulated genes
+ego_CC <- enrichGO(gene = gene_down,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+```{r}
+ego_BP <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_down, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+ggsave("p.png",p,height=20)
+```
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+
+
+
+
+
+```{r}
+#Go enrichment analysis of dendritic cells group 3
+DC_g3.response <- data.frame(gene = rownames(DC_g3.response), DC_g3.response)
+head(DC_g3.response)
+```
+
+
+```{r}
+logFC_t=0.5
+P.Value_t = 0.05
+k1 = (DC_g3.response$p_val_adj < P.Value_t)&(DC_g3.response$avg_log2FC < -logFC_t)
+k2 = (DC_g3.response$p_val_adj < P.Value_t)&(DC_g3.response$avg_log2FC > logFC_t)
+table(k1)
+```
+
+```{r}
+table(k2)
+```
+
+```{r}
+change = ifelse(k1,"down",ifelse(k2,"up","stable"))
+DC_g3.response$change <- change
+head(DC_g3.response)
+```
+
+```{r}
+s2e <- bitr(DC_g3.response$gene, fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+DC_g3.response <- inner_join(DC_g3.response,s2e,by=c("gene"="SYMBOL"))
+head(DC_g3.response)
+```
+
+```{r}
+#GO[Symbol]
+gene_up = DC_g3.response[DC_g3.response$change == 'up','gene'] 
+gene_down = DC_g3.response[DC_g3.response$change == 'down','gene'] 
+gene_diff = c(gene_up,gene_down)
+```
+
+
+```{r}
+# up regulated genes
+ego_CC <- enrichGO(gene = gene_up,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_up, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+```{r}
+# down regulated genes
+ego_CC <- enrichGO(gene = gene_down,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_down, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+```
+
+```{r}
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#Go enrichment analysis of dendritic cells group 4
+DC_g4.response <- data.frame(gene = rownames(DC_g4.response), DC_g4.response)
+head(DC_g4.response)
+```
+
+
+```{r}
+logFC_t=0.5
+P.Value_t = 0.05
+k1 = (DC_g4.response$p_val_adj < P.Value_t)&(DC_g4.response$avg_log2FC < -logFC_t)
+k2 = (DC_g4.response$p_val_adj < P.Value_t)&(DC_g4.response$avg_log2FC > logFC_t)
+table(k1)
+```
+
+```{r}
+table(k2)
+```
+
+```{r}
+change = ifelse(k1,"down",ifelse(k2,"up","stable"))
+DC_g4.response$change <- change
+head(DC_g4.response)
+```
+
+```{r}
+s2e <- bitr(DC_g4.response$gene, fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+DC_g4.response <- inner_join(DC_g4.response,s2e,by=c("gene"="SYMBOL"))
+head(DC_g4.response)
+```
+
+```{r}
+#GO[Symbol]
+gene_up = DC_g4.response[DC_g4.response$change == 'up','gene'] 
+gene_down = DC_g4.response[DC_g4.response$change == 'down','gene'] 
+gene_diff = c(gene_up,gene_down)
+```
+
+
+```{r}
+# up regulated gene
+ego_CC <- enrichGO(gene = gene_up,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_up, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+```{r}
+# down regulated gene
+ego_CC <- enrichGO(gene = gene_down,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_down, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+```
+
+```{r}
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+
+```{r}
+# Go enrichment analysis of macrophage
+Macrophage.compare.response <- data.frame(gene = rownames(Macrophage.compare.response), Macrophage.compare.response)
+head(Macrophage.compare.response)
+```
+
+```{r}
+logFC_t=0.5
+P.Value_t = 0.05
+k1 = (Macrophage.compare.response$p_val_adj < P.Value_t)&(Macrophage.compare.response$avg_log2FC < -logFC_t)
+k2 = (Macrophage.compare.response$p_val_adj < P.Value_t)&(Macrophage.compare.response$avg_log2FC > logFC_t)
+table(k1)
+```
+
+```{r}
+table(k2)
+```
+
+```{r}
+change = ifelse(k1,"down",ifelse(k2,"up","stable"))
+Macrophage.compare.response$change <- change
+head(Macrophage.compare.response)
+```
+
+```{r}
+s2e <- bitr(Macrophage.compare.response$gene, fromType = "SYMBOL",toType = "ENTREZID",OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+Macrophage.compare.response <- inner_join(Macrophage.compare.response,s2e,by=c("gene"="SYMBOL"))
+head(Macrophage.compare.response)
+```
+
+```{r}
+#GO[Symbol]
+gene_up = Macrophage.compare.response[Macrophage.compare.response$change == 'up','gene'] 
+gene_down = Macrophage.compare.response[Macrophage.compare.response$change == 'down','gene'] 
+gene_diff = c(gene_up,gene_down)
+```
+
+
+```{r}
+# up regulated gene
+ego_CC <- enrichGO(gene = gene_up,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_up,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_up, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+```
+
+```{r}
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
+
+
+
+```{r}
+# down regulated gene
+ego_CC <- enrichGO(gene = gene_down,keyType = 'SYMBOL', OrgDb = org.Hs.eg.db,  ont= "CC",pAdjustMethod = "BH", pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_CC))
+```
+
+```{r}
+ego_BP <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "BP",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_BP))
+```
+
+```{r}
+ego_MF <- enrichGO(gene= gene_down,OrgDb= org.Hs.eg.db,keyType= 'SYMBOL',ont= "MF",pAdjustMethod = "BH",pvalueCutoff  = 0.01,qvalueCutoff  = 0.05)
+head(as.data.frame(ego_MF))
+```
+
+```{r}
+go <- enrichGO(gene = gene_down, OrgDb = "org.Hs.eg.db", keyType= 'SYMBOL',ont="all")
+head(go)
+```
+
+```{r}
+p <- dotplot(go, split="ONTOLOGY") +facet_grid(ONTOLOGY~., scale="free")
+p
+```
+
+```{r}
+ggsave("p.png",p,height=20)
+```
+
+
+```{r}
+go<- cnetplot(go, showCategory = 5) 
+go
+ggsave("go.png",go)
+```
+
