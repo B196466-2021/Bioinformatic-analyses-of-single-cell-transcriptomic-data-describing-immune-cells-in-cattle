@@ -1,17 +1,21 @@
 #!/bin/bash
-#!/bin/bash
 # Grid Engine options
 #$ -N CellRanger_count
 #$ -cwd
-#$ -o /exports/cmvm/eddie/eb/groups/Hope_Group/Barbara_Shih/2021-04-28-_9649_-Jayne_Hope_scRNA-Seq_bovine_lymph/log/CellRanger_count.out
-#$ -e /exports/cmvm/eddie/eb/groups/Hope_Group/Barbara_Shih/2021-04-28-_9649_-Jayne_Hope_scRNA-Seq_bovine_lymph/log/CellRanger_count.err
+#$ -o /exports/eddie/scratch/s2170612/CellRanger_count.out
+#$ -e /exports/eddie/scratch/s2170612/CellRanger_count.err
 #$ -m bea
-#$ -pe sharedmem 6
+#$ -pe sharedmem 8
 #$ -l h_vmem=20G
-#$ -l h_rt=120:00:0
+#$ -l h_rt=48:00:0
 #$ -R y
 # Initialise the modules framework
 . /etc/profile.d/modules.sh
 module load igmm/apps/cellranger/5.0.0
 
-cellranger count --id=sample1 --transcriptome=/exports/cmvm/eddie/eb/groups/Hope_Group/Tiancheng/data/ref --fastqs=/exports/cmvm/eddie/eb/groups/Hope_Group/Tiancheng/data/11858HJPool01-N__11858HJ0001 --sample=11858HJPool01-N__11858HJ0001
+#### -pe sharedmem 6 --- Ani set it to 6 core, 20G. Setting a smaller amout for now to make sure it runs
+
+cellranger count --id=11858HJPool01-N__11858HJ0001_cellranger \
+--transcriptome=/exports/eddie/scratch/s2170612/ref \
+--fastqs=/exports/eddie/scratch/s2170612/fastq/11858HJPool01-N__11858HJ0001 \
+--sample=11858HJPool01-N__11858HJ0001 \
