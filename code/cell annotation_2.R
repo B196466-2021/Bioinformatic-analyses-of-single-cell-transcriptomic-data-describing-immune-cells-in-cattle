@@ -1,13 +1,13 @@
 #! /usr/bin/Rscript
+
 # Cell type annotation using SingleR
 monaco.ref <- celldex::MonacoImmuneData()
 compare.sce <- as.SingleCellExperiment(compare)
 monaco.main <- SingleR(test = compare.sce,assay.type.test = 1,ref = monaco.ref,labels = monaco.ref$label.main)
 compare@meta.data$monaco.main <- monaco.main$pruned.labels
 compare.annotation <- SetIdent(compare, value = "monaco.main")
-SingleR<-DimPlot(compare.annotation, label = T , repel = T, label.size = 3)
-SingleR
-ggsave("SingleR.png",SingleR)
+DimPlot(compare.annotation, label = T , repel = T, label.size = 3)
+
 
 
 # Show dendritic cells groups location

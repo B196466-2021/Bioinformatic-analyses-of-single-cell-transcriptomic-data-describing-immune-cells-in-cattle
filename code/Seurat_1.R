@@ -1,7 +1,8 @@
 #! /usr/bin/Rscript
-#########################
-# Load libraries
-#########################
+
+################################
+# Load libraries ###############
+################################
 library(Seurat)
 library(Matrix)
 library(SeuratData)
@@ -74,12 +75,6 @@ post<-merge(result2, c(result4,result6,result8), add.cell.ids = c("602791_Post_B
 pre$type <- "Pre_BCG"
 post$type <- "Post_BCG"
 compare<-merge(pre, c(post), add.cell.ids = c("Pre_BCG", "Post_BCG"))
-compare
-
-# Clear unused variables
-rm(data1,result1,data2,result2,data3,result3,data4,result4,data5,result5,data6,result6,data7,result7,data8,result8,pre,post)
-gc()
-
 
 ##############################
 ## doubletFinder 
@@ -142,18 +137,10 @@ compare[["percent.rb"]] <- PercentageFeatureSet(compare, pattern = "^RP[SL]")
 VlnPlot(compare, features = c("nFeature_RNA","nCount_RNA","percent.mt","percent.rb"),group.by = "orig.ident",ncol = 4,pt.size = 0.1) 
 
 # Scatter Plot
-Scatter1<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
-Scatter1
-ggsave("Scatter1.png",Scatter1)
-Scatter2<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident", pt.size = 0.5)
-Scatter2
-ggsave("Scatter2.png",Scatter2)
-Scatter3<-FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.rb",group.by = "orig.ident", pt.size = 0.5)
-Scatter3
-ggsave("Scatter3.png",Scatter3)
-Scatter4<-FeatureScatter(compare, feature1 = "percent.rb", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
-Scatter4
-ggsave("Scatter4.png",Scatter4)
+FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
+FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "nFeature_RNA",group.by = "orig.ident", pt.size = 0.5)
+FeatureScatter(compare, feature1 = "nCount_RNA", feature2 = "percent.rb",group.by = "orig.ident", pt.size = 0.5)
+FeatureScatter(compare, feature1 = "percent.rb", feature2 = "percent.mt",group.by = "orig.ident", pt.size = 0.5)
 
 # Detection-based filtering
 # consider cells with at least 200 detected genes and genes need to be expressed in at least 3 cells
@@ -161,12 +148,12 @@ selected_c <- WhichCells(compare, expression =  nFeature_RNA >200 & nFeature_RNA
 selected_f <- rownames(compare)[Matrix::rowSums(compare) > 3]
 compare <- subset(compare, features = selected_f, cells = selected_c)
 
-
 # Mito/Ribo filtering
 selected_mito <- WhichCells(compare, expression = percent.mt < 0.5 & percent.mt >0.05)
 selected_ribo <- WhichCells(compare, expression = percent.rb < 60 & percent.rb > 5)
 selected_RNA <- WhichCells(compare, expression = nCount_RNA < 39000)
-# and subset the object to only keep those cells
+
+# Subset the object to only keep those cells
 compare <- subset(compare, cells = selected_mito)
 compare <- subset(compare, cells = selected_ribo)
 compare <- subset(compare, cells = selected_RNA)
@@ -176,16 +163,12 @@ table(compare$orig.ident)
 # Plot filtered QC
 VlnPlot(compare, features = c("nFeature_RNA","nCount_RNA","percent.mt","percent.rb"),group.by = "orig.ident",ncol = 4,pt.size = 0.1) 
 
-
 # Calculate cell-cycle scores
 compare <- NormalizeData(compare)
 compare <- CellCycleScoring(object = compare, g2m.features = cc.genes$g2m.genes,s.features = cc.genes$s.genes)
 
 # Cell cycle plot
-cell_cycle<-VlnPlot(compare, features = c("S.Score", "G2M.Score"), group.by = "orig.ident",ncol = 4, pt.size = 0.1)
-cell_cycle
-ggsave("cell_cycle.png",cell_cycle,width=20, height=10)
-
+VlnPlot(compare, features = c("S.Score", "G2M.Score"), group.by = "orig.ident",ncol = 4, pt.size = 0.1)
 
 
 
@@ -195,8 +178,8 @@ ggsave("cell_cycle.png",cell_cycle,width=20, height=10)
 compare <- NormalizeData(compare)
 compare <- FindVariableFeatures(compare, verbose = F,selection.method = "vst", nfeatures = 2000)
 # Run the standard workflow for visualization and clustering
-# All genes are treated with a mean of 0 and a standard deviation of 1. Highly expressed genes and lowly expressed genes are treated equally. Standardization
-# scaladata cell cycle If there are differences, just pick what you want
+# All genes are treated with a mean of 0 and a standard deviation of 1. Highly expressed genes and lowly expressed genes are treated equally. 
+#Standardization scaladata cell cycle If there are differences, just pick what you want
 compare <- ScaleData(compare,verbose = F, vars.to.regress = c("nFeature_RNA", "percent.mt"))
 #Keep the variation and process 2000 to 20 features
 compare <- RunPCA(compare,npcs =20, verbose = FALSE)
