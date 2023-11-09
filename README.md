@@ -38,6 +38,7 @@ In this experiment, a bovine model's immunological response induced by macrophag
 
 ## Workflow
 ![demo](assets/Workflow.png)
+
 ```
 [Seurat_1](code/Seurat_1.R)
 [cell annotation_2](code/cell annotation_2.R)
