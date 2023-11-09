@@ -28,13 +28,12 @@ Tuberculosis (TB) is a recurrent respiratory infectious disease resulting from t
 
 
 ## Introduction
-
 In this experiment, a bovine model's immunological response induced by macrophages and dendritic cells will be the main subject because cattle are also partially protected by BCG and are good models for human disease and vaccine studies. The experimental results can also be applied to humans. The samples we studied were including both dendritic cells subjected to fluorescence-activated cell sorting and immune cells from whole lymph nodes. By using bioinformatics packages such as CellRanger (version 2.2.0) and Seurat (version 2.3.4) to analyze the single cell transcriptomic data, we compared differentially expressed genes in dendritic cells and macrophages after BCG injection. We also looked for the relevant cellular pathways affected using enrichment analysis. The experimental results can provide guidance and insights for subsequent research on tuberculosis control methods and the development of novel vaccines.
 
 ![pre](pic/pre.png)
 
 ## Raw data
-
+The original data provided here is the data processed by cellranger.
 [Raw_data](data/)
 
 ## Workflow
@@ -42,8 +41,11 @@ In this experiment, a bovine model's immunological response induced by macrophag
 
 
 [Seurat_1](code/Seurat_1.R)
+
 [cell_annotation_2](code/cell_annotation_2.R)
+
 [diff_3](code/diff_3.R)
+
 [enrich_4](code/enrich_4.R)
 
 
