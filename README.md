@@ -34,7 +34,8 @@ In this experiment, a bovine model's immunological response induced by macrophag
 ![pre](pic/pre.png)
 
 ## Raw data
-[data](data/)
+
+[Raw_data](data/)
 
 ## Workflow
 ![demo](assets/Workflow.png)
