@@ -37,9 +37,9 @@ The original data provided here is the data processed by cellranger.
 [Raw_data](data/)
 
 ## Workflow
-![demo](assets/Workflow.png)
-
-
+- Cell clustering (seurat and tSNE+UAMP)
+- Visualize **marker genes**
+- Differential gene set **Functional annotation and visualization**
 [Seurat_1](code/Seurat_1.R)
 
 [cell_annotation_2](code/cell_annotation_2.R)
@@ -47,6 +47,11 @@ The original data provided here is the data processed by cellranger.
 [diff_3](code/diff_3.R)
 
 [enrich_4](code/enrich_4.R)
+
+![demo](assets/Workflow.png)
+
+
+
 
 
 
