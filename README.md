@@ -42,7 +42,7 @@ In this experiment, a bovine model's immunological response induced by macrophag
 
 
 [Seurat_1](code/Seurat_1.R)
-[cell annotation_2](code/cell annotation_2.R)
+[cell_annotation_2](code/cell_annotation_2.R)
 [diff_3](code/diff_3.R)
 [enrich_4](code/enrich_4.R)
 
