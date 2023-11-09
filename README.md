@@ -34,5 +34,5 @@ In this experiment, a bovine model's immunological response induced by macrophag
 ![pre](pic/pre.png)
 
 ## Raw data
-![data](single cell transcriptomic data)
+![data](single cell transcriptomic data/)
 
