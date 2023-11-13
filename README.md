@@ -38,13 +38,13 @@ The original data provided here is the data processed by cellranger.
 
 ## Workflow
 - Cell clustering (seurat and tSNE+UAMP)
-- [Seurat_1](code/Seurat_1.R)
+- [Seurat](code/Seurat_1.R)
 - Visualize marker genes
-- [cell_annotation_2](code/cell_annotation_2.R)
+- [Cell annotation](code/cell_annotation_2.R)
 - Differential gene set
-- [diff_3](code/diff_3.R)
+- [DEG](code/diff_3.R)
 - Functional annotation and visualization
-- [enrich_4](code/enrich_4.R)
+- [Enrichment analysis](code/enrich_4.R)
 
 ![demo](assets/Workflow.png)
 
