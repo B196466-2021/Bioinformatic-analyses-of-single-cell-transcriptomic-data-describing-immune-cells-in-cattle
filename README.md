@@ -33,8 +33,8 @@ In this experiment, a bovine model's immunological response induced by macrophag
 ![pre](pic/pre.png)
 
 ## Raw data
--The original data provided here is the data processed by cellranger.
--[Raw data](data/)
+- The original data provided here is the data processed by cellranger.
+- [Raw data](data/)
 
 ## Workflow
 - Cell clustering (seurat and tSNE+UAMP)
